@@ -33,9 +33,11 @@ class CloudflareCli < Formula
     assert_match version.to_s, shell_output("#{bin}/cf --version")
     assert_match version.to_s, shell_output("#{bin}/cloudflare --version")
 
-    output = shell_output("#{bin}/cloudflare d1 query homebrew-test --local " \
+    database_id = "00000000-0000-4000-8000-000000000042"
+    output = shell_output("#{bin}/cloudflare d1 raw #{database_id} --local " \
                           "--persist-to=#{testpath}/state --sql='SELECT 42 AS answer' --json")
-    result = JSON.parse(output)
-    assert_equal 42, result.first.fetch("results").first.fetch("answer")
+    result = JSON.parse(output).first.fetch("results")
+    assert_equal ["answer"], result.fetch("columns")
+    assert_equal [[42]], result.fetch("rows")
   end
 end

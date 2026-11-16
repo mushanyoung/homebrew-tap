@@ -1,0 +1,60 @@
+name: Test formula
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formula-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, ubuntu-24.04]
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_ANALYTICS: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      CF_SEND_TELEMETRY: "false"
+    steps:
+      - name: Set up Homebrew and check out the tap
+        id: brew
+        uses: Homebrew/actions/setup-homebrew@63a2d4d8d4193eab3e62b1b782ff3ab8408f5b29 # 2026.11.09.1
+        with:
+          stable: true
+
+      - name: Check formula style
+        env:
+          TAP_PATH: ${{ steps.brew.outputs.repository-path }}
+        run: brew style "$TAP_PATH/Formula/cloudflare-cli.rb"
+
+      - name: Install the formula
+        env:
+          TAP_NAME: ${{ steps.brew.outputs.tap-name }}
+        run: brew install --build-from-source --yes "$TAP_NAME/cloudflare-cli"
+
+      - name: Audit the installed formula
+        env:
+          TAP_NAME: ${{ steps.brew.outputs.tap-name }}
+        run: brew audit --strict --online "$TAP_NAME/cloudflare-cli"
+
+      - name: Test both executables and the local D1 runtime
+        env:
+          TAP_NAME: ${{ steps.brew.outputs.tap-name }}
+        run: brew test --verbose "$TAP_NAME/cloudflare-cli"
+
+      - name: Check dynamic library linkage
+        env:
+          TAP_NAME: ${{ steps.brew.outputs.tap-name }}
+        run: brew linkage --test "$TAP_NAME/cloudflare-cli"
